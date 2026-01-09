@@ -36,7 +36,7 @@ const exampleUsage = `  # Typically invoked by Kustomize, not directly by users
     annotations:
       config.kubernetes.io/function: |
         container:
-          image: quay.io/lburgazzoli/olm-extractor:latest
+          image: quay.io/lburgazzoli/olm-extractor:main
           network: true
   spec:
     source: quay.io/example/operator:v1.0.0
@@ -52,7 +52,7 @@ const exampleUsage = `  # Typically invoked by Kustomize, not directly by users
     annotations:
       config.kubernetes.io/function: |
         container:
-          image: quay.io/lburgazzoli/olm-extractor:latest
+          image: quay.io/lburgazzoli/olm-extractor:main
           network: true
   spec:
     source: prometheus:1.2.3

@@ -19,7 +19,7 @@ A CLI tool that extracts Kubernetes manifests from OLM bundles for direct instal
 **Using Container Image:**
 
 ```bash
-docker run --rm quay.io/lburgazzoli/olm-extractor:main \
+podman run --rm quay.io/lburgazzoli/olm-extractor:main \
   run quay.io/example/operator:v1.0.0 -n operators | kubectl apply -f -
 ```
 
@@ -52,7 +52,7 @@ metadata:
   annotations:
     config.kubernetes.io/function: |
       container:
-        image: quay.io/lburgazzoli/olm-extractor:latest
+        image: quay.io/lburgazzoli/olm-extractor:main
         network: true
 spec:
   source: quay.io/example/operator:v1.0.0
@@ -111,6 +111,10 @@ bundle-extract run --cert-manager-enabled=false \
 **Listing Related Images:**
 
 ```bash
+# Run from GitHub without installing
+go run github.com/lburgazzoli/olm-extractor/cmd@latest \
+  images ls quay.io/example/operator:v1.0.0
+
 # List all container images (operator + related) from a bundle
 bundle-extract images ls quay.io/example/operator:v1.0.0
 

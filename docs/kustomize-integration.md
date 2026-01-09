@@ -52,7 +52,7 @@ metadata:
   annotations:
     config.kubernetes.io/function: |
       container:
-        image: quay.io/lburgazzoli/olm-extractor:latest
+        image: quay.io/lburgazzoli/olm-extractor:main
         network: true
 spec:
   source: quay.io/example/operator:v1.0.0
@@ -103,7 +103,7 @@ metadata:
   annotations:
     config.kubernetes.io/function: |
       container:
-        image: quay.io/lburgazzoli/olm-extractor:latest
+        image: quay.io/lburgazzoli/olm-extractor:main
         network: true
 spec:
   # Source is the bundle image
@@ -144,7 +144,7 @@ metadata:
   annotations:
     config.kubernetes.io/function: |
       container:
-        image: quay.io/lburgazzoli/olm-extractor:latest
+        image: quay.io/lburgazzoli/olm-extractor:main
         network: true
 spec:
   # Source is the package name (optionally with version)
@@ -172,7 +172,7 @@ annotations:
   config.kubernetes.io/function: |
     container:
       # Container image to use
-      image: quay.io/lburgazzoli/olm-extractor:latest
+      image: quay.io/lburgazzoli/olm-extractor:main
       
       # Network access (required for pulling images)
       network: true
@@ -199,7 +199,7 @@ Mount your Docker config file to provide credentials:
 annotations:
   config.kubernetes.io/function: |
     container:
-      image: quay.io/lburgazzoli/olm-extractor:latest
+      image: quay.io/lburgazzoli/olm-extractor:main
       network: true
       mounts:
         - type: bind
@@ -212,13 +212,13 @@ annotations:
 - Works with credential helpers (osxkeychain, wincred)
 - Supports multiple registries
 - No passwords in YAML files
-- Uses existing `docker login` credentials
+- Uses existing `podman login` or `docker login` credentials
 
 **Setup:**
 
 ```bash
 # Login to your registry
-docker login registry.example.com
+podman login registry.example.com
 
 # Credentials are now available
 kustomize build --enable-alpha-plugins --network .
@@ -232,7 +232,7 @@ Pass credentials via environment variables:
 annotations:
   config.kubernetes.io/function: |
     container:
-      image: quay.io/lburgazzoli/olm-extractor:latest
+      image: quay.io/lburgazzoli/olm-extractor:main
       network: true
       env:
         - BUNDLE_EXTRACT_REGISTRY_USERNAME=myuser
@@ -272,7 +272,7 @@ Or via environment variable:
 annotations:
   config.kubernetes.io/function: |
     container:
-      image: quay.io/lburgazzoli/olm-extractor:latest
+      image: quay.io/lburgazzoli/olm-extractor:main
       network: true
       env:
         - BUNDLE_EXTRACT_REGISTRY_INSECURE=true
@@ -482,12 +482,12 @@ Error: failed to pull image...
 
 1. **Verify image exists:**
    ```bash
-   docker pull quay.io/example/operator:v1.0.0
+   podman pull quay.io/example/operator:v1.0.0
    ```
 
 2. **Check authentication:**
    ```bash
-   docker login registry.example.com
+   podman login registry.example.com
    ```
 
 3. **Use insecure flag for self-signed certs:**
@@ -511,7 +511,7 @@ If `kustomize build` produces no resources:
    annotations:
      config.kubernetes.io/function: |  # Note the | for multiline
        container:
-         image: quay.io/lburgazzoli/olm-extractor:latest
+         image: quay.io/lburgazzoli/olm-extractor:main
          network: true
    ```
 
@@ -531,14 +531,14 @@ Error: permission denied...
 
 **Solutions:**
 
-1. **Ensure Docker is running:**
+1. **Ensure Podman/Docker is running:**
    ```bash
-   docker ps
+   podman ps
    ```
 
-2. **Check Docker permissions:**
+2. **Check container runtime permissions:**
    ```bash
-   docker run --rm hello-world
+   podman run --rm hello-world
    ```
 
 3. **Verify mount paths exist:**
@@ -593,12 +593,12 @@ Enable verbose output:
 kustomize build --enable-alpha-plugins . 2>&1 | tee build.log
 
 # Check container execution
-docker ps -a | grep olm-extractor
+podman ps -a | grep olm-extractor
 ```
 
 ## Best Practices
 
-1. **Use Docker Config Mount**: Prefer mounting `~/.docker/config.json` over inline credentials
+1. **Use Config Mount**: Prefer mounting `~/.docker/config.json` over inline credentials
 2. **Pin Image Versions**: Use specific tags instead of `:latest` for reproducibility
 3. **Version Control**: Commit generator configs to Git alongside applications
 4. **Test Locally**: Run `kustomize build` before pushing to verify output

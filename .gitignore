@@ -49,3 +49,4 @@ config.local.yaml
 *.local
 .claude/
 .docker/
+.podman/

@@ -22,7 +22,7 @@ metadata:
   annotations:
     config.kubernetes.io/function: |
       container:
-        image: quay.io/lburgazzoli/olm-extractor:latest
+        image: quay.io/lburgazzoli/olm-extractor:main
         network: true
 spec:
   # Source: bundle image OR package[:version] (depending on mode)
@@ -71,7 +71,7 @@ metadata:
   annotations:
     config.kubernetes.io/function: |
       container:
-        image: quay.io/lburgazzoli/olm-extractor:latest
+        image: quay.io/lburgazzoli/olm-extractor:main
         network: true
 spec:
   source: quay.io/example/operator-bundle:v1.0.0
@@ -90,7 +90,7 @@ metadata:
   annotations:
     config.kubernetes.io/function: |
       container:
-        image: quay.io/lburgazzoli/olm-extractor:latest
+        image: quay.io/lburgazzoli/olm-extractor:main
         network: true
 spec:
   source: prometheus:0.56.0  # package:version
@@ -114,7 +114,7 @@ metadata:
   annotations:
     config.kubernetes.io/function: |
       container:
-        image: quay.io/lburgazzoli/olm-extractor:latest
+        image: quay.io/lburgazzoli/olm-extractor:main
         network: true
         mounts:
           - type: bind
@@ -140,7 +140,7 @@ metadata:
   annotations:
     config.kubernetes.io/function: |
       container:
-        image: quay.io/lburgazzoli/olm-extractor:latest
+        image: quay.io/lburgazzoli/olm-extractor:main
         network: true
         env:
           - BUNDLE_EXTRACT_REGISTRY_USERNAME=myuser
@@ -365,7 +365,7 @@ metadata:
   annotations:
     config.kubernetes.io/function: |
       container:
-        image: quay.io/lburgazzoli/olm-extractor:latest
+        image: quay.io/lburgazzoli/olm-extractor:main
         network: true
         mounts:
           - type: bind
@@ -387,9 +387,9 @@ spec:
 
 If you encounter authentication errors:
 
-1. Verify credentials: `docker login registry.example.com`
+1. Verify credentials: `podman login registry.example.com`
 2. Check credential helper: `docker-credential-osxkeychain list`
-3. Ensure Docker config is mounted correctly
+3. Ensure config file `~/.docker/config.json` is mounted correctly
 4. Try inline credentials for testing (not recommended for production)
 
 ### Resource Generation Errors

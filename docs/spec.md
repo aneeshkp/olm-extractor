@@ -156,20 +156,20 @@ The tool automatically uses platform-specific credential helpers when configured
 
 **macOS:**
 - Uses `docker-credential-osxkeychain` to read from macOS Keychain
-- Credentials stored via `docker login` are automatically available
+- Credentials stored via `podman login` or `docker login` are automatically available
 
 **Windows:**
 - Uses `docker-credential-wincred` to read from Windows Credential Manager
-- Credentials stored via `docker login` are automatically available
+- Credentials stored via `podman login` or `docker login` are automatically available
 
 **Linux:**
 - Supports `docker-credential-secretservice` for GNOME Keyring/KWallet
 - Supports cloud provider helpers (ecr-login, gcr, gcloud)
 
-No additional configuration is needed - if Docker can authenticate, so can this tool
+No additional configuration is needed - if Docker or Podman can authenticate, so can this tool
 
 ```bash
-docker run --rm -v ~/.docker:/root/.docker:ro \
+podman run --rm -v ~/.docker:/root/.docker:ro \
   quay.io/lburgazzoli/olm-extractor:main \
   registry.redhat.io/my-operator:v1.0.0 -n operators | kubectl apply -f -
 ```
@@ -481,7 +481,7 @@ bundle-extract --cert-manager-issuer-name letsencrypt-prod --cert-manager-issuer
 # Extract without cert-manager integration
 bundle-extract --cert-manager-enabled=false ./bundle -n operators | kubectl apply -f -
 
-# Extract from private registry (after docker login)
+# Extract from private registry (after podman login or docker login)
 bundle-extract registry.example.com/private/operator:v1.0.0 -n operators | kubectl apply -f -
 
 # Extract from private registry with inline credentials

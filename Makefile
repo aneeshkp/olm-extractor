@@ -43,26 +43,24 @@ build:
 	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) \
 		go build -ldflags "$(LDFLAGS)" -o $(BINARY_NAME) cmd/main.go
 
-# Ensure buildx builder exists for multi-platform builds
-.PHONY: buildx-setup
-buildx-setup:
-	@docker buildx inspect multiplatform >/dev/null 2>&1 || \
-		(echo "Creating buildx builder for multi-platform builds..." && \
-		 docker buildx create --name multiplatform --driver docker-container --bootstrap --use)
-
-# Build and push container image using Docker buildx
+# Build and push container image using Podman
 .PHONY: publish
-publish: buildx-setup
+publish:
 	@echo "Building and pushing container image to $(CONTAINER_REPO):$(CONTAINER_TAGS)"
-	docker buildx build \
-		--builder=multiplatform \
+	@MANIFEST_NAME="localhost/olm-extractor-build:$(VERSION)"; \
+	podman build \
 		--platform=$(CONTAINER_PLATFORMS) \
 		--build-arg VERSION=$(VERSION) \
 		--build-arg COMMIT=$(COMMIT) \
 		--build-arg DATE=$(DATE) \
-		--tag=$(CONTAINER_REPO):$(CONTAINER_TAGS) \
-		--push \
-		.
+		--manifest=$$MANIFEST_NAME \
+		.; \
+	TAGS="$(CONTAINER_TAGS)"; \
+	for tag in $${TAGS//,/ }; do \
+		echo "Pushing manifest to $(CONTAINER_REPO):$$tag"; \
+		podman manifest push $$MANIFEST_NAME docker://$(CONTAINER_REPO):$$tag; \
+	done; \
+	podman manifest rm $$MANIFEST_NAME 2>/dev/null || true
 
 # Run the CLI
 .PHONY: run

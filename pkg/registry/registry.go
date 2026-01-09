@@ -120,7 +120,7 @@ func ExtractImage(ctx context.Context, imageRef string, opts ...Option) (Resourc
 	img, err := remote.Image(ref, remoteOpts...)
 	if err != nil {
 		if cfg.username == "" && cfg.password == "" {
-			return resource, fmt.Errorf("failed to pull image %s: %w\nEnsure you have authenticated with 'docker login' or credentials are in ~/.docker/config.json", imageRef, err)
+			return resource, fmt.Errorf("failed to pull image %s: %w\nEnsure you have authenticated with 'podman login' or 'docker login' or credentials are in ~/.docker/config.json", imageRef, err)
 		}
 
 		return resource, fmt.Errorf("failed to pull image %s: %w", imageRef, err)
