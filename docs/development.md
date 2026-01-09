@@ -94,15 +94,18 @@ The variables are defined in `internal/version/version.go` and populated from:
 
 ## Testing
 
-Run all tests:
+**Always use `make test` instead of calling `go test` directly**:
 ```bash
 make test
 ```
+
+The Makefile ensures consistent test execution across all environments and CI.
 
 Test packages:
 - `cmd/` - Namespace validation
 - `pkg/kube/` - IsNamespaced, CreateNamespace, SetNamespace
 - `pkg/render/` - CleanUnstructured (nil/empty field removal)
+- `pkg/images/` - Image extraction from bundles
 
 ## Key Dependencies
 
@@ -186,7 +189,9 @@ Uses golangci-lint v2 with configuration in `.golangci.yml`. Key enabled linters
 - gci (import ordering)
 - gochecknoglobals
 
-Run with:
+**Always use `make lint` instead of calling `golangci-lint` directly**:
 ```bash
 make lint
 ```
+
+The Makefile ensures consistent linting across all environments and CI.

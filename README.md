@@ -7,6 +7,7 @@ A CLI tool that extracts Kubernetes manifests from OLM bundles for direct instal
 - **CLI Mode**: Extract manifests and pipe directly to kubectl
 - **Kustomize Integration**: Use as a KRM function generator in kustomization.yaml
 - **Catalog Support**: Resolve operators from OLM catalogs by package name
+- **Image Listing**: Extract related container images for mirroring to disconnected registries
 - **Cert-Manager Integration**: Automatic webhook certificate management
 - **Resource Filtering**: Include/exclude resources using jq expressions
 - **Registry Authentication**: Support for private registries and credential helpers
@@ -105,6 +106,23 @@ bundle-extract run --cert-manager-issuer-name my-cluster-issuer \
 # Disable cert-manager integration
 bundle-extract run --cert-manager-enabled=false \
   quay.io/example/operator:v1.0.0 -n operators | kubectl apply -f -
+```
+
+**Listing Related Images:**
+
+```bash
+# List all container images (operator + related) from a bundle
+bundle-extract images ls quay.io/example/operator:v1.0.0
+
+# List images from a catalog
+bundle-extract images ls --catalog quay.io/operatorhubio/catalog:latest prometheus
+
+# Output as JSON array
+bundle-extract images ls --output=json quay.io/example/operator:v1.0.0
+
+# Mirror images to a private registry
+bundle-extract images ls quay.io/example/operator:v1.0.0 | \
+  xargs -I{} skopeo copy docker://{} docker://mirror.example.com/{}
 ```
 
 ## Documentation

@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/lburgazzoli/olm-extractor/cmd/images"
 	"github.com/lburgazzoli/olm-extractor/cmd/krm"
 	"github.com/lburgazzoli/olm-extractor/cmd/run"
 	"github.com/lburgazzoli/olm-extractor/internal/version"
@@ -42,6 +43,7 @@ func main() {
 	// Add subcommands
 	rootCmd.AddCommand(run.NewCommand())
 	rootCmd.AddCommand(krm.NewCommand())
+	rootCmd.AddCommand(images.NewCommand())
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

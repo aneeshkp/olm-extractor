@@ -503,18 +503,92 @@ bundle-extract ./bundle -n default > install.yaml
 bundle-extract --version
 ```
 
+## Images Subcommand
+
+The `images` subcommand extracts related container images from OLM bundles. This is useful for disconnected/airgapped installations where all container images must be known in advance for mirroring.
+
+### Usage
+
+```bash
+bundle-extract images ls <bundle-path-or-image> [flags]
+```
+
+### Flags
+
+| Flag | Short | Description | Default |
+|------|-------|-------------|---------|
+| `--output` | `-o` | Output format: `text` or `json` | `text` |
+| `--env-pattern` | `-e` | Environment variable prefix to match | `RELATED_IMAGE` |
+| `--include-operator-images` | | Include operator container images | `true` |
+| `--catalog` | | Catalog image to resolve bundle from | |
+| `--channel` | | Channel to use when resolving from catalog | |
+| `--temp-dir` | | Directory for temporary files | |
+| `--registry-insecure` | | Allow insecure registry connections | `false` |
+| `--registry-username` | | Registry authentication username | |
+| `--registry-password` | | Registry authentication password | |
+
+### Output Formats
+
+**text (default)**: One image per line, suitable for piping to other tools.
+```
+quay.io/operator/controller:v1.0.0
+quay.io/prometheus/prometheus:v2.40.0
+quay.io/prometheus/alertmanager:v0.25.0
+```
+
+**json**: JSON array of image references.
+```json
+[
+  "quay.io/operator/controller:v1.0.0",
+  "quay.io/prometheus/prometheus:v2.40.0"
+]
+```
+
+### Examples
+
+```bash
+# List all images from a bundle (operator + related)
+bundle-extract images ls ./bundle
+
+# List images from a bundle container image
+bundle-extract images ls quay.io/example/operator-bundle:v1.0.0
+
+# List images from a catalog
+bundle-extract images ls --catalog quay.io/operatorhubio/catalog:latest prometheus
+
+# Exclude operator container images (only related images)
+bundle-extract images ls --include-operator-images=false ./bundle
+
+# Output as JSON
+bundle-extract images ls --output=json ./bundle
+
+# Use custom environment variable pattern
+bundle-extract images ls --env-pattern=MY_IMAGE ./bundle
+
+# Mirror images using skopeo
+bundle-extract images ls ./bundle | xargs -I{} skopeo copy docker://{} docker://mirror.example.com/{}
+```
+
 ## Project Structure
 
 ```
 olm-extractor/
 ├── cmd/
 │   ├── main.go              # CLI entry point
-│   └── main_test.go         # Namespace validation tests
+│   ├── images/
+│   │   └── images.go        # images subcommand
+│   ├── run/
+│   │   └── run.go           # run subcommand
+│   └── krm/
+│       └── krm.go           # krm subcommand
 ├── pkg/
 │   ├── bundle/
 │   │   └── bundle.go        # Bundle loading from directory/image
 │   ├── extract/
 │   │   └── extract.go       # Manifest extraction from bundle
+│   ├── images/
+│   │   ├── images.go        # Related images extraction
+│   │   └── images_test.go   # Related images tests
 │   ├── kube/
 │   │   ├── kube.go          # Kubernetes resource helpers
 │   │   └── kube_test.go     # Helper function tests
@@ -539,6 +613,7 @@ olm-extractor/
 |---------|---------|---------|
 | `pkg/bundle` | `Load`, `LoadFromImage` | Load OLM bundles from directory or container image |
 | `pkg/extract` | `Manifests`, `CRDs`, `InstallStrategy`, `Webhooks`, `WebhookServices`, `OtherResources` | Extract K8s resources from bundle |
+| `pkg/images` | `Extract`, `Result` | Extract related container images from bundles |
 | `pkg/kube` | `CreateNamespace`, `CreateDeployment`, `CreateWebhookService`, `IsNamespaced`, `SetNamespace` | Kubernetes resource helpers |
 | `pkg/render` | `YAML`, `ToUnstructured`, `CleanUnstructured` | YAML output and object cleaning |
 | `internal/version` | `Version`, `Commit`, `Date` | Build version info (internal only) |
