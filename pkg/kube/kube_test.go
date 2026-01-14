@@ -3,6 +3,7 @@ package kube_test
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/lburgazzoli/olm-extractor/pkg/kube"
@@ -152,5 +153,166 @@ func TestValidateNamespace(t *testing.T) {
 	t.Run("rejects namespace with dots", func(t *testing.T) {
 		g := NewWithT(t)
 		g.Expect(kube.ValidateNamespace("test.ns")).To(MatchError(ContainSubstring("must not contain dots")))
+	})
+}
+
+func TestCleanUnstructured(t *testing.T) {
+	t.Run("preserves empty string in environment variable value field", func(t *testing.T) {
+		g := NewWithT(t)
+
+		// Create an unstructured object with an env var that has empty string value
+		obj := &unstructured.Unstructured{
+			Object: map[string]any{
+				"apiVersion": "apps/v1",
+				"kind":       "Deployment",
+				"spec": map[string]any{
+					"template": map[string]any{
+						"spec": map[string]any{
+							"containers": []any{
+								map[string]any{
+									"name": "test",
+									"env": []any{
+										map[string]any{
+											"name":  "WATCH_NAMESPACE",
+											"value": "", // Empty string should be preserved
+										},
+										map[string]any{
+											"name":  "OTHER_VAR",
+											"value": "non-empty",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		cleaned := kube.CleanUnstructured(obj)
+
+		// Verify the structure is preserved
+		containers, found, err := unstructured.NestedSlice(cleaned.Object, "spec", "template", "spec", "containers")
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(found).To(BeTrue())
+		g.Expect(containers).To(HaveLen(1))
+
+		container := containers[0].(map[string]any)
+		env, found, err := unstructured.NestedSlice(container, "env")
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(found).To(BeTrue())
+		g.Expect(env).To(HaveLen(2))
+
+		// Check WATCH_NAMESPACE with empty value is preserved
+		watchNsEnv := env[0].(map[string]any)
+		g.Expect(watchNsEnv["name"]).To(Equal("WATCH_NAMESPACE"))
+		g.Expect(watchNsEnv).To(HaveKey("value"))
+		g.Expect(watchNsEnv["value"]).To(Equal(""))
+
+		// Check OTHER_VAR is preserved
+		otherEnv := env[1].(map[string]any)
+		g.Expect(otherEnv["name"]).To(Equal("OTHER_VAR"))
+		g.Expect(otherEnv["value"]).To(Equal("non-empty"))
+	})
+
+	t.Run("removes empty strings from non-env-var fields", func(t *testing.T) {
+		g := NewWithT(t)
+
+		obj := &unstructured.Unstructured{
+			Object: map[string]any{
+				"apiVersion": "v1",
+				"kind":       "ConfigMap",
+				"data": map[string]any{
+					"key1": "",          // Should be removed
+					"key2": "non-empty", // Should be kept
+				},
+			},
+		}
+
+		cleaned := kube.CleanUnstructured(obj)
+
+		data, found, err := unstructured.NestedMap(cleaned.Object, "data")
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(found).To(BeTrue())
+		g.Expect(data).To(HaveLen(1))
+		g.Expect(data).ToNot(HaveKey("key1")) // Empty string removed
+		g.Expect(data).To(HaveKey("key2"))
+	})
+
+	t.Run("does not preserve empty strings in maps with only name field", func(t *testing.T) {
+		g := NewWithT(t)
+
+		// A map with just "name" is NOT an env var (missing value/valueFrom)
+		obj := &unstructured.Unstructured{
+			Object: map[string]any{
+				"apiVersion": "v1",
+				"kind":       "ConfigMap",
+				"metadata": map[string]any{
+					"name": "test-config",
+				},
+				"data": map[string]any{
+					"someField": "", // Should be removed (not an env var)
+				},
+			},
+		}
+
+		cleaned := kube.CleanUnstructured(obj)
+
+		// When all fields in "data" are removed, the entire "data" map is removed too
+		_, found, err := unstructured.NestedMap(cleaned.Object, "data")
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(found).To(BeFalse()) // data field removed entirely because all values were empty
+	})
+
+	t.Run("preserves empty value in env var with valueFrom", func(t *testing.T) {
+		g := NewWithT(t)
+
+		// EnvVar with valueFrom should also be detected (even if value happens to be empty)
+		obj := &unstructured.Unstructured{
+			Object: map[string]any{
+				"apiVersion": "apps/v1",
+				"kind":       "Deployment",
+				"spec": map[string]any{
+					"template": map[string]any{
+						"spec": map[string]any{
+							"containers": []any{
+								map[string]any{
+									"name": "test",
+									"env": []any{
+										map[string]any{
+											"name": "FROM_SECRET",
+											"valueFrom": map[string]any{
+												"secretKeyRef": map[string]any{
+													"name": "my-secret",
+													"key":  "password",
+												},
+											},
+											"value": "", // Edge case: has both (unusual but valid)
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		cleaned := kube.CleanUnstructured(obj)
+
+		containers, found, err := unstructured.NestedSlice(cleaned.Object, "spec", "template", "spec", "containers")
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(found).To(BeTrue())
+
+		container := containers[0].(map[string]any)
+		env, found, err := unstructured.NestedSlice(container, "env")
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(found).To(BeTrue())
+
+		envVar := env[0].(map[string]any)
+		g.Expect(envVar["name"]).To(Equal("FROM_SECRET"))
+		g.Expect(envVar).To(HaveKey("valueFrom"))
+		g.Expect(envVar).To(HaveKey("value"))
+		g.Expect(envVar["value"]).To(Equal("")) // Preserved because it's an env var
 	})
 }

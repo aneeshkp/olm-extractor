@@ -85,6 +85,7 @@ func Execute(ctx context.Context, reader io.Reader, writer io.Writer) error {
 	unstructuredObjects, err = extract.ApplyTransformations(
 		unstructuredObjects,
 		cfg.Namespace,
+		cfg.WatchNamespace,
 		cfg.Include,
 		cfg.Exclude,
 		cfg.CertManager,

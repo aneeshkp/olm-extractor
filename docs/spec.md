@@ -73,6 +73,7 @@ bundle-extract --catalog <catalog-image> <package>[:version] --namespace <namesp
 
 | Argument | Short | Description | Default |
 |----------|-------|-------------|---------|
+| `--watch-namespace` | | Namespace value for WATCH_NAMESPACE env var (see Environment Variable Transformations) | Empty (cluster-wide) |
 | `--include` | | jq expression to include resources (repeatable, acts as OR) | None |
 | `--exclude` | | jq expression to exclude resources (repeatable, acts as OR) | None |
 | `--temp-dir` | | Directory for temporary files and cache | System temp directory |
@@ -92,6 +93,7 @@ All flags can be configured using environment variables with the `BUNDLE_EXTRACT
 | Flag | Environment Variable | Example |
 |------|---------------------|---------|
 | `--namespace` | `BUNDLE_EXTRACT_NAMESPACE` | `export BUNDLE_EXTRACT_NAMESPACE=operators` |
+| `--watch-namespace` | `BUNDLE_EXTRACT_WATCH_NAMESPACE` | `export BUNDLE_EXTRACT_WATCH_NAMESPACE=watched-ns` |
 | `--temp-dir` | `BUNDLE_EXTRACT_TEMP_DIR` | `export BUNDLE_EXTRACT_TEMP_DIR=/mnt/fast-storage` |
 | `--cert-manager-enabled` | `BUNDLE_EXTRACT_CERT_MANAGER_ENABLED` | `export BUNDLE_EXTRACT_CERT_MANAGER_ENABLED=false` |
 | `--cert-manager-issuer-name` | `BUNDLE_EXTRACT_CERT_MANAGER_ISSUER_NAME` | `export BUNDLE_EXTRACT_CERT_MANAGER_ISSUER_NAME=my-issuer` |
@@ -461,6 +463,63 @@ Should not show certificate-related errors.
 - Check cert-manager CA injector is running: `kubectl get pods -n cert-manager -l app=cainjector`
 
 For detailed documentation on the webhook certificate resolution and configuration process, see [docs/webhook-certificates.md](webhook-certificates.md).
+
+### Environment Variable Transformations
+
+OLM operators often use environment variables that reference pod metadata through Kubernetes field selectors. The most common example is `WATCH_NAMESPACE`, which OLM sets dynamically using a field reference to the `olm.targetNamespaces` annotation. Since this annotation doesn't exist outside of OLM, the tool automatically transforms these environment variables to direct values.
+
+#### WATCH_NAMESPACE Transformation
+
+OLM typically configures the `WATCH_NAMESPACE` environment variable like this:
+
+```yaml
+env:
+  - name: WATCH_NAMESPACE
+    valueFrom:
+      fieldRef:
+        fieldPath: metadata.annotations['olm.targetNamespaces']
+```
+
+The tool automatically detects this pattern and replaces it with a direct value:
+
+```yaml
+env:
+  - name: WATCH_NAMESPACE
+    value: operators  # Set to --watch-namespace value
+```
+
+#### Configuration
+
+By default, `WATCH_NAMESPACE` is set to empty string, which configures the operator to watch all namespaces (cluster-wide):
+
+```bash
+# WATCH_NAMESPACE will be set to "" (cluster-wide - default)
+bundle-extract quay.io/example/operator:v1.0.0 -n operators | kubectl apply -f -
+```
+
+**For single-namespace operators** (operators that should only watch their own namespace), set `--watch-namespace` to the target namespace:
+
+```bash
+# WATCH_NAMESPACE will be set to "operators"
+bundle-extract --watch-namespace=operators quay.io/example/operator:v1.0.0 -n operators | kubectl apply -f -
+```
+
+**For multi-namespace scenarios**, specify a different namespace:
+
+```bash
+# Operator deployed in "operators" namespace, but watches "apps" namespace
+bundle-extract --watch-namespace=apps quay.io/example/operator:v1.0.0 -n operators | kubectl apply -f -
+```
+
+#### Scope
+
+The transformation affects environment variables named `WATCH_NAMESPACE` in Deployment containers and initContainers when:
+- They have a `valueFrom.fieldRef` to `metadata.annotations['olm.targetNamespaces']` (OLM pattern), OR
+- They have no `value` field set at all (undefined value)
+
+In both cases, the transformation sets an explicit `value` field with the `--watch-namespace` parameter.
+
+Other environment variables (like `POD_NAME`, `POD_NAMESPACE`, etc.) are preserved unchanged, as they reference standard Kubernetes fields that exist at runtime.
 
 ### Examples
 

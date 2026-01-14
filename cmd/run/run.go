@@ -20,14 +20,15 @@ import (
 
 // Config holds all configuration for the run subcommand.
 type Config struct {
-	Namespace   string                `mapstructure:"namespace"`
-	Include     []string              `mapstructure:"include"`
-	Exclude     []string              `mapstructure:"exclude"`
-	TempDir     string                `mapstructure:"temp-dir"`
-	Catalog     string                `mapstructure:"catalog"`
-	Channel     string                `mapstructure:"channel"`
-	CertManager certmanager.Config    `mapstructure:",squash"`
-	Registry    bundle.RegistryConfig `mapstructure:",squash"`
+	Namespace      string                `mapstructure:"namespace"`
+	WatchNamespace string                `mapstructure:"watch-namespace"`
+	Include        []string              `mapstructure:"include"`
+	Exclude        []string              `mapstructure:"exclude"`
+	TempDir        string                `mapstructure:"temp-dir"`
+	Catalog        string                `mapstructure:"catalog"`
+	Channel        string                `mapstructure:"channel"`
+	CertManager    certmanager.Config    `mapstructure:",squash"`
+	Registry       bundle.RegistryConfig `mapstructure:",squash"`
 }
 
 const longDescription = `Extract Kubernetes manifests from an OLM bundle and output installation-ready YAML.
@@ -105,6 +106,7 @@ func NewCommand() *cobra.Command {
 
 	// Define flags
 	cmd.Flags().StringP("namespace", "n", "", "Target namespace for installation (required)")
+	cmd.Flags().String("watch-namespace", "", "Namespace value for WATCH_NAMESPACE env var (empty = cluster-wide, default)")
 	cmd.Flags().StringArray("include", []string{}, "jq expression to include resources (repeatable, acts as OR)")
 	cmd.Flags().StringArray("exclude", []string{}, "jq expression to exclude resources (repeatable, acts as OR)")
 	cmd.Flags().String("temp-dir", "", "Directory for temporary files and cache (defaults to system temp directory)")
@@ -179,6 +181,7 @@ func execute(ctx context.Context, input string) error {
 	unstructuredObjects, err = extract.ApplyTransformations(
 		unstructuredObjects,
 		cfg.Namespace,
+		cfg.WatchNamespace,
 		cfg.Include,
 		cfg.Exclude,
 		cfg.CertManager,

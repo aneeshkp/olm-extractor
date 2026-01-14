@@ -10,6 +10,7 @@ import (
 	"github.com/operator-framework/operator-lifecycle-manager/pkg/controller/registry/resolver"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -113,6 +114,7 @@ func postProcessResources(objects []runtime.Object) ([]runtime.Object, error) {
 func ApplyTransformations(
 	objects []*unstructured.Unstructured,
 	namespace string,
+	watchNamespace string,
 	includeExprs []string,
 	excludeExprs []string,
 	certManagerCfg certmanager.Config,
@@ -127,6 +129,16 @@ func ApplyTransformations(
 		}
 	}
 
+	// Sort for kubectl apply order
+	kube.SortForApply(objects)
+
+	// Transform WATCH_NAMESPACE environment variables
+	for i := range objects {
+		if err := transformWatchNamespace(objects[i], watchNamespace); err != nil {
+			return nil, fmt.Errorf("failed to transform WATCH_NAMESPACE: %w", err)
+		}
+	}
+
 	// Configure cert-manager
 	if certManagerCfg.Enabled {
 		objects, err = certmanager.Configure(objects, namespace, certManagerCfg)
@@ -134,9 +146,6 @@ func ApplyTransformations(
 			return nil, fmt.Errorf("failed to configure cert-manager: %w", err)
 		}
 	}
-
-	// Sort for kubectl apply order
-	kube.SortForApply(objects)
 
 	return objects, nil
 }
@@ -164,6 +173,113 @@ func applyFilters(
 	}
 
 	return filtered, nil
+}
+
+// transformWatchNamespace transforms WATCH_NAMESPACE env vars to direct values.
+// Any WATCH_NAMESPACE environment variable found in containers or initContainers
+// will have its value set to the watchNamespace parameter, replacing any existing
+// value or valueFrom configuration (including OLM's fieldRef pattern).
+func transformWatchNamespace(obj *unstructured.Unstructured, watchNamespace string) error {
+	// Only process apps/v1 Deployment resources
+	if obj.GroupVersionKind() != gvks.Deployment {
+		return nil
+	}
+
+	// Convert to typed Deployment for type-safe manipulation
+	dep, err := kube.Convert[*appsv1.Deployment](obj)
+	if err != nil {
+		return fmt.Errorf("failed to convert to Deployment: %w", err)
+	}
+
+	// Process containers
+	for i := range dep.Spec.Template.Spec.Containers {
+		transformContainerEnvVars(&dep.Spec.Template.Spec.Containers[i], watchNamespace)
+	}
+
+	// Process initContainers
+	for i := range dep.Spec.Template.Spec.InitContainers {
+		transformContainerEnvVars(&dep.Spec.Template.Spec.InitContainers[i], watchNamespace)
+	}
+
+	// Convert back to unstructured
+	converted, err := kube.ToUnstructured(dep)
+	if err != nil {
+		return fmt.Errorf("failed to convert Deployment to unstructured: %w", err)
+	}
+
+	// Ensure empty WATCH_NAMESPACE values are preserved in unstructured
+	// The typed->unstructured conversion omits empty strings due to omitempty tags
+	ensureWatchNamespaceValue(converted, watchNamespace)
+
+	// Update the original object in-place
+	obj.Object = converted.Object
+
+	return nil
+}
+
+// ensureWatchNamespaceValue ensures WATCH_NAMESPACE env vars have explicit value fields.
+// This is necessary because ToUnstructured omits empty strings due to omitempty JSON tags.
+func ensureWatchNamespaceValue(obj *unstructured.Unstructured, watchNamespace string) {
+	// Process containers
+	containers, found, _ := unstructured.NestedSlice(obj.Object, "spec", "template", "spec", "containers")
+	if found {
+		ensureValueInContainers(containers, watchNamespace)
+		_ = unstructured.SetNestedSlice(obj.Object, containers, "spec", "template", "spec", "containers")
+	}
+
+	// Process initContainers
+	initContainers, found, _ := unstructured.NestedSlice(obj.Object, "spec", "template", "spec", "initContainers")
+	if found {
+		ensureValueInContainers(initContainers, watchNamespace)
+		_ = unstructured.SetNestedSlice(obj.Object, initContainers, "spec", "template", "spec", "initContainers")
+	}
+}
+
+// ensureValueInContainers ensures WATCH_NAMESPACE env vars have explicit value fields.
+func ensureValueInContainers(containers []any, watchNamespace string) {
+	for i := range containers {
+		container, ok := containers[i].(map[string]any)
+		if !ok {
+			continue
+		}
+
+		env, found, _ := unstructured.NestedSlice(container, "env")
+		if !found {
+			continue
+		}
+
+		for j := range env {
+			envVar, ok := env[j].(map[string]any)
+			if !ok {
+				continue
+			}
+
+			name, _, _ := unstructured.NestedString(envVar, "name")
+			if name != "WATCH_NAMESPACE" {
+				continue
+			}
+
+			// Explicitly set value field if missing (happens when watchNamespace is empty string)
+			if _, hasValue := envVar["value"]; !hasValue {
+				envVar["value"] = watchNamespace
+			}
+		}
+
+		_ = unstructured.SetNestedSlice(container, env, "env")
+	}
+}
+
+// transformContainerEnvVars transforms WATCH_NAMESPACE environment variables in a container.
+func transformContainerEnvVars(container *corev1.Container, watchNamespace string) {
+	for i := range container.Env {
+		envVar := &container.Env[i]
+
+		// If WATCH_NAMESPACE env var is present, set its value
+		if envVar.Name == "WATCH_NAMESPACE" {
+			envVar.Value = watchNamespace
+			envVar.ValueFrom = nil // Clear ValueFrom if it was set
+		}
+	}
 }
 
 // CRDs extracts CustomResourceDefinitions from the bundle.

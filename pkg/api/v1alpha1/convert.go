@@ -8,14 +8,15 @@ import (
 // Config holds all configuration for the application.
 // This is the internal representation used by the extraction pipeline.
 type Config struct {
-	Namespace   string
-	Include     []string
-	Exclude     []string
-	TempDir     string
-	Catalog     string
-	Channel     string
-	CertManager certmanager.Config
-	Registry    bundle.RegistryConfig
+	Namespace      string
+	WatchNamespace string
+	Include        []string
+	Exclude        []string
+	TempDir        string
+	Catalog        string
+	Channel        string
+	CertManager    certmanager.Config
+	Registry       bundle.RegistryConfig
 }
 
 // ToConfig converts an Extractor to the internal Config structure and returns the source input.
@@ -24,10 +25,11 @@ type Config struct {
 // - input is either the bundle image or package[:version] depending on mode.
 func (e *Extractor) ToConfig(tempDir string) (Config, string, error) {
 	cfg := Config{
-		Namespace: e.Spec.Namespace,
-		Include:   e.Spec.Include,
-		Exclude:   e.Spec.Exclude,
-		TempDir:   tempDir,
+		Namespace:      e.Spec.Namespace,
+		WatchNamespace: e.Spec.WatchNamespace,
+		Include:        e.Spec.Include,
+		Exclude:        e.Spec.Exclude,
+		TempDir:        tempDir,
 		CertManager: certmanager.Config{
 			Enabled:    boolValue(e.Spec.CertManager.Enabled, true),
 			IssuerName: e.Spec.CertManager.IssuerName,

@@ -22,6 +22,10 @@ type ExtractorSpec struct {
 	// Namespace is the target namespace for installation
 	Namespace string `json:"namespace"`
 
+	// WatchNamespace is the namespace value for WATCH_NAMESPACE env var (defaults to empty for cluster-wide)
+	// +optional
+	WatchNamespace string `json:"watchNamespace,omitempty"`
+
 	// Include contains jq expressions to include resources (repeatable, acts as OR)
 	// +optional
 	Include []string `json:"include,omitempty"`

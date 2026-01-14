@@ -78,12 +78,35 @@ func cleanMap(obj map[string]any) map[string]any {
 	result := make(map[string]any)
 
 	for key, value := range obj {
+		// Preserve empty "value" field in environment variables
+		// This allows WATCH_NAMESPACE to have an explicit empty string value
+		if key == "value" && isEnvVarMap(obj) {
+			if str, ok := value.(string); ok && str == "" {
+				result[key] = ""
+
+				continue
+			}
+		}
+
 		if cleaned := cleanValue(value); cleaned != nil {
 			result[key] = cleaned
 		}
 	}
 
 	return result
+}
+
+// isEnvVarMap checks if a map represents an environment variable entry.
+// Per Kubernetes corev1.EnvVar semantics, environment variables MUST have:
+// - "name" field (required).
+// - AND at least one of: "value" or "valueFrom" (mutually exclusive but one required).
+func isEnvVarMap(m map[string]any) bool {
+	_, hasName := m["name"]
+	_, hasValue := m["value"]
+	_, hasValueFrom := m["valueFrom"]
+
+	// Match actual Kubernetes EnvVar structure to avoid false positives
+	return hasName && (hasValue || hasValueFrom)
 }
 
 // cleanValue recursively cleans a value by removing nil and empty collections.
