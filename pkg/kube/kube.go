@@ -88,6 +88,16 @@ func cleanMap(obj map[string]any) map[string]any {
 			}
 		}
 
+		// Preserve "subresources" field as-is (e.g., status: {}, scale: {})
+		// CRDs require subresources.status to enable the /status subresource endpoint.
+		// Without this, controllers using UpdateStatus() will fail on vanilla Kubernetes.
+		// We preserve the entire value without cleaning to keep empty maps like status: {}.
+		if key == "subresources" && value != nil {
+			result[key] = value
+
+			continue
+		}
+
 		if cleaned := cleanValue(value); cleaned != nil {
 			result[key] = cleaned
 		}

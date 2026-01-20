@@ -315,4 +315,93 @@ func TestCleanUnstructured(t *testing.T) {
 		g.Expect(envVar).To(HaveKey("value"))
 		g.Expect(envVar["value"]).To(Equal("")) // Preserved because it's an env var
 	})
+
+	t.Run("preserves empty subresources status in CRD", func(t *testing.T) {
+		g := NewWithT(t)
+
+		// Create a CRD-like object with subresources.status: {}
+		// This is critical for Kubernetes controllers that use UpdateStatus()
+		obj := &unstructured.Unstructured{
+			Object: map[string]any{
+				"apiVersion": "apiextensions.k8s.io/v1",
+				"kind":       "CustomResourceDefinition",
+				"metadata": map[string]any{
+					"name": "certmanagers.operator.openshift.io",
+				},
+				"spec": map[string]any{
+					"group": "operator.openshift.io",
+					"versions": []any{
+						map[string]any{
+							"name":    "v1alpha1",
+							"served":  true,
+							"storage": true,
+							"subresources": map[string]any{
+								"status": map[string]any{}, // Empty status map - must be preserved!
+							},
+							"schema": map[string]any{
+								"openAPIV3Schema": map[string]any{
+									"type": "object",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		cleaned := kube.CleanUnstructured(obj)
+
+		// Verify the structure is preserved
+		versions, found, err := unstructured.NestedSlice(cleaned.Object, "spec", "versions")
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(found).To(BeTrue())
+		g.Expect(versions).To(HaveLen(1))
+
+		version := versions[0].(map[string]any)
+
+		// The subresources field must be preserved even though status: {} is empty
+		subresources, found, err := unstructured.NestedMap(version, "subresources")
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(found).To(BeTrue(), "subresources field must be preserved")
+		g.Expect(subresources).To(HaveKey("status"), "subresources.status must be preserved")
+	})
+
+	t.Run("preserves subresources with scale in CRD", func(t *testing.T) {
+		g := NewWithT(t)
+
+		// CRD with both status and scale subresources
+		obj := &unstructured.Unstructured{
+			Object: map[string]any{
+				"apiVersion": "apiextensions.k8s.io/v1",
+				"kind":       "CustomResourceDefinition",
+				"spec": map[string]any{
+					"versions": []any{
+						map[string]any{
+							"name": "v1",
+							"subresources": map[string]any{
+								"status": map[string]any{},
+								"scale": map[string]any{
+									"specReplicasPath":   ".spec.replicas",
+									"statusReplicasPath": ".status.replicas",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		cleaned := kube.CleanUnstructured(obj)
+
+		versions, found, err := unstructured.NestedSlice(cleaned.Object, "spec", "versions")
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(found).To(BeTrue())
+
+		version := versions[0].(map[string]any)
+		subresources, found, err := unstructured.NestedMap(version, "subresources")
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(found).To(BeTrue())
+		g.Expect(subresources).To(HaveKey("status"))
+		g.Expect(subresources).To(HaveKey("scale"))
+	})
 }
